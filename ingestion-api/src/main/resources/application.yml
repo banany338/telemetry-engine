@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: ingestion-api
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/telemetry
+    username: admin
+    password: password
+    driver-class-name: org.postgresql.Driver
+
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8080
