@@ -1,0 +1,48 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  java-build:
+    name: Build Ingestion API (Java)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ingestion-api
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          # cache: 'maven'
+
+      - name: Dummy Maven Test
+        run: echo "mvn clean test"
+
+  python-build:
+    name: Build Anomaly Worker (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./anomaly-worker
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Dummy Pytest
+        run: echo "pytest"
