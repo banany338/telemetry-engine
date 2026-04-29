@@ -56,7 +56,7 @@ def main():
             batch_size = random.randint(10, 50)
             
             # Determine if this batch is Chaos
-            is_chaos = random.random() < 0.10
+            is_chaos = random.random() < 0.4
             chaos_type = None
             if is_chaos:
                 chaos_type = random.choice(["error_storm", "latency_spike"])
