@@ -20,6 +20,9 @@ DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 # Instantiate SQLAlchemy engine outside the loop to reuse connection pool
 engine = create_engine(DATABASE_URL)
 
+# In-memory history for Z-Score calculation (sliding window of max 10 points per service)
+historical_stats = {}
+
 def record_anomaly(timestamp, service_name, anomaly_type, description):
     print(f"\n🚨 [ANOMALY DETECTED] 🚨")
     print(f"Service: {service_name} | Type: {anomaly_type} | Desc: {description}")
@@ -60,27 +63,58 @@ def analyze_window():
     # Group by service name
     grouped = df.groupby('service_name')
     
+    db_latency_high = False
+    checkout_error_high = False
+    
     for service_name, group in grouped:
+        if service_name not in historical_stats:
+            historical_stats[service_name] = []
+            
         total_requests = len(group)
+        
+        # p95 Latency Calculation
+        p95_latency = group['response_time_ms'].quantile(0.95)
         
         # Calculate Error Rate
         non_success_count = len(group[~group['status_code'].isin([200, 201])])
-        error_rate = non_success_count / total_requests
+        error_rate = non_success_count / total_requests if total_requests > 0 else 0
         
-        if error_rate > 0.05:
-            description = f"Error rate reached {error_rate * 100:.2f}% ({non_success_count}/{total_requests} requests failed)"
-            record_anomaly(now_utc, service_name, "error_storm", description)
+        # Check for Cascading conditions
+        if service_name == "database-service" and p95_latency > 800:
+            db_latency_high = True
+        if service_name == "checkout-service" and error_rate > 0.05:
+            checkout_error_high = True
             
-        # Calculate Latency Check
-        avg_latency = group['response_time_ms'].mean()
+        history = historical_stats[service_name]
         
-        if avg_latency > 1000:
-            description = f"Average latency spiked to {avg_latency:.2f}ms"
-            record_anomaly(now_utc, service_name, "latency_spike", description)
+        # Cold Start Fix: Require at least 5 data points before calculating Z-Score
+        if len(history) >= 5:
+            hist_series = pd.Series(history)
+            mean_latency = hist_series.mean()
+            std_latency = hist_series.std()
+            
+            # Avoid ZeroDivisionError if std is 0
+            if std_latency > 0:
+                z_score = (p95_latency - mean_latency) / std_latency
+                
+                # Progressive Degradation Anomaly (Z-Score > 2)
+                if z_score > 2:
+                    desc = f"p95 latency ({p95_latency:.2f}ms) is {z_score:.2f} std devs above mean ({mean_latency:.2f}ms)"
+                    record_anomaly(now_utc, service_name, "progressive_degradation", desc)
+        
+        # Append current p95 to history, keep sliding window of size 10
+        history.append(p95_latency)
+        if len(history) > 10:
+            history.pop(0)
+            
+    # Cascade Detection Evaluation
+    if db_latency_high and checkout_error_high:
+        desc = "High database latency cascading into high checkout service error rates."
+        record_anomaly(now_utc, "system-wide", "cascading_failure", desc)
 
 
 def main():
-    print(f"Starting Anomaly Detection Worker... Connected to {DB_HOST}:{DB_PORT}")
+    print(f"Starting Advanced Anomaly Worker... Connected to {DB_HOST}:{DB_PORT}")
     print("Press Ctrl+C to stop.")
     
     try:
