@@ -1,5 +1,5 @@
 services:
-  db:
+  postgres:
     image: postgres:16
     container_name: telemetry-db
     ports:
@@ -10,3 +10,50 @@ services:
       POSTGRES_DB: telemetry
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - telemetry-net
+
+  ingestion-api:
+    build:
+      context: ./ingestion-api
+    container_name: telemetry-ingestion-api
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/telemetry
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+    depends_on:
+      - postgres
+    networks:
+      - telemetry-net
+
+  data-generator:
+    build:
+      context: ./data-gen
+    container_name: telemetry-data-generator
+    environment:
+      INGESTION_API_URL: http://ingestion-api:8080/api/v1/logs
+    depends_on:
+      - ingestion-api
+    networks:
+      - telemetry-net
+
+  anomaly-worker:
+    build:
+      context: ./anomaly-worker
+    container_name: telemetry-anomaly-worker
+    environment:
+      DB_USER: admin
+      DB_PASS: password
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: telemetry
+    depends_on:
+      - postgres
+    networks:
+      - telemetry-net
+
+networks:
+  telemetry-net:
+    driver: bridge
