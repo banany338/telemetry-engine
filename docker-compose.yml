@@ -49,6 +49,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: telemetry
+      DISCORD_WEBHOOK_URL: https://discord.com/api/webhooks/1499788731677413407/R_75BYMXsGOurc8NkipZqCxz0eCnwF6QuSJGi4hWJ0FiQrgcWTEQptsy0l7yXLDzntlG
     depends_on:
       - postgres
     networks:

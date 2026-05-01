@@ -1,6 +1,7 @@
 import os
 import time
 import uuid
+import requests
 import pandas as pd
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
@@ -27,6 +28,20 @@ def record_anomaly(timestamp, service_name, anomaly_type, description):
     print(f"\n🚨 [ANOMALY DETECTED] 🚨")
     print(f"Service: {service_name} | Type: {anomaly_type} | Desc: {description}")
     
+    webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
+    if webhook_url:
+        payload = {
+            "content": f"🚨 **CRITICAL ANOMALY DETECTED** 🚨\n**Service:** {service_name}\n**Type:** {anomaly_type}\n**Details:** {description}"
+        }
+        try:
+            response = requests.post(webhook_url, json=payload, timeout=5)
+            response.raise_for_status()
+        except Exception as e:
+            print(f"Failed to send Discord alert: {type(e).__name__} - {e}")
+            if isinstance(e, requests.exceptions.HTTPError):
+                print(f"HTTP Status Code: {e.response.status_code}")
+                print(f"Response Body: {e.response.text}")
+
     insert_query = text("""
         INSERT INTO anomalies (id, timestamp, service_name, anomaly_type, description)
         VALUES (:id, :timestamp, :service_name, :anomaly_type, :description)
