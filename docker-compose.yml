@@ -54,6 +54,18 @@ services:
     networks:
       - telemetry-net
 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: telemetry-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on:
+      - postgres
+    networks:
+      - telemetry-net
+
 networks:
   telemetry-net:
     driver: bridge
